@@ -31,14 +31,28 @@ void enter_raw_mode(void) {
 	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) {
 		DIE("tcsetattr");
 	}
+	// set cursor to bar
+	WRITE_LIT("\033]50;CursorShape=1\x7");
 }
 
 void exit_raw_mode(void) {
+	// set cursor back to block
+	WRITE_LIT("\033]50;CursorShape=0\x7");
 	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1) {
 		DIE("tcsetattr");
 	}
 }
-
+int write_file(char *path, char *buffer, size_t len) {
+	FILE *f = fopen(path, "w");
+	if (f == NULL) return -1;
+	
+	if (fwrite(buffer, 1, len, f) != len) {
+		return -1;
+	}
+	
+	fclose(f);
+	return 0;
+}
 
 char *read_file(char *path) {
 	FILE *f = fopen(path, "r");
@@ -70,11 +84,10 @@ char *read_file(char *path) {
 }
 
 
-Lines *gen_lines(char *buffer) {
+Lines *gen_lines(char *buffer, size_t len) {
 	Lines *ls = lines_new();
 	Line l;
-	size_t counter = 0;
-	size_t len = strlen(buffer);
+	size_t counter = 0; // empty files should still have one line
 	l.start = 0;
 	while (counter < len) {
 		if (buffer[counter] == '\n') {
@@ -84,6 +97,7 @@ Lines *gen_lines(char *buffer) {
 		}
 		counter += 1;
 	}
+	lines_append(ls, (Line){.start = counter + 1, .len = 0}); // add empty line at the end always
 	return ls;
 }
 
@@ -127,9 +141,9 @@ int main(int argc, char **argv) {
 	             .text				= NULL,
 							 .scrollh			= 0,
 							 .real_cursor = 0,
-							 .scrollv			= 0 };
+							 .scrollv			= 0, };
 	
-	if (get_screen_size(&e.cols, &e.rows) < 0) {
+	if (set_screen_size(&e) < 0) {
 		DIE("get_screen_size");
 	}
 	if (path) {
@@ -137,7 +151,8 @@ int main(int argc, char **argv) {
 	} else {
 		e.text = strdup("Hello World\nAAAA\nUawau\n");
 	}
-	e.lines = gen_lines(e.text);
+	e.str_len = strlen(e.text);
+	e.lines = gen_lines(e.text, e.str_len);
 	
 	while (!e.quit) {
 		handle_output(&e);
@@ -175,41 +190,40 @@ void lines_free(Lines *ls) {
 	free(ls);
 }
 
-int inline current_line(Editor *e) {
+size_t inline current_line(Editor *e) {
 	return e->scrollv + e->cy;
 }
-int inline current_column(Editor *e) {
+size_t inline current_column(Editor *e) {
 	return e->scrollh + e->cx;
 }
 
 void delete_char(Editor *e, bool inplace) {
-	int col = current_column(e);
-	if (!inplace) col -= 1;
-	int line = current_line(e);
-	int offset = e->lines->buff[line].start + col;
-	size_t len = strlen(e->text);
-	memmove(&e->text[offset], &e->text[offset + 1], len - (offset + 1));
+	if (e->real_cursor == 0) return;
+	if (inplace) e->real_cursor += 1;
+	size_t len = e->str_len;
+	memmove(&e->text[e->real_cursor - 1], &e->text[e->real_cursor], len - e->real_cursor);
 	e->text[len - 1] = '\0';
-	e->lines = gen_lines(e->text);
+	lines_free(e->lines);
+	e->str_len -= 1;
+	e->lines = gen_lines(e->text, e->str_len);
 }
+
 void write_char(Editor *e, char c) {
-	int col = current_column(e);
-	int line = current_line(e);
-	int offset = e->lines->buff[line].start + col;
-	size_t len = strlen(e->text);
+	size_t len = e->str_len;
 	e->text = realloc(e->text, len + 1 + 1);
 	if (e->text == NULL)
 		DIE("realloc");
-	memmove(&e->text[offset + 1], &e->text[offset], len - (offset + 1));
-	e->text[offset] = c;
-	e->lines = gen_lines(e->text);
+	memmove(&e->text[e->real_cursor + 1], &e->text[e->real_cursor], len - e->real_cursor);
+	e->text[e->real_cursor] = c;
+	e->text[len + 1] = '\0';
+	lines_free(e->lines);
+	e->str_len += 1;
+	e->lines = gen_lines(e->text, e->str_len);
 }
-
 
 void set_cursor(Editor *e) {
 	size_t lcount = 0;
-	size_t counter = 0;
-	while (counter++ < e->real_cursor) {
+	for (size_t counter = 0; counter < e->real_cursor; counter++) {
 		char c = e->text[counter];
 		if (c == '\n' || c == '\0') {
 			lcount += 1;
@@ -218,4 +232,8 @@ void set_cursor(Editor *e) {
 	e->cy = lcount;
 	int line = current_line(e);
 	e->cx = e->real_cursor - e->lines->buff[line].start;
+}
+void editor_save_file(Editor *e) {
+	fprintf(stderr, "writing file\n");
+	write_file("welp.bak", e->text, e->str_len);
 }

@@ -4,13 +4,13 @@
 #include <string.h>
 #include <sys/ioctl.h>
 
-int get_screen_size(int *c, int *r) {
+int set_screen_size(Editor *e) {
 	struct winsize ws;
 	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) < 0) {
 	  return -1;
 	}
-	*c = ws.ws_col;
-	*r = ws.ws_row;
+	e->cols = ws.ws_col;
+	e->rows = ws.ws_row;
 	return 0;
 }
 
@@ -25,18 +25,21 @@ static void clear_screen(void) {
 void handle_output(Editor *e) {
 	clear_screen();
 	// draw text
-	for (int i = 0; i < e->lines->len; i++) {
-		if (i > e->rows) break;
-		Line l = e->lines->buff[i + e->scrollv];
-		//char *buff = malloc(l.len + 5);
-		//size_t len = snprintf(buff, l.len + 5, "%d %.*s", i, l.len, e->text + l.start + e->scrollh);
-		//WRITE(buff, len);
-		WRITE(e->text + l.start + e->scrollh, l.len);
-		//free(buff);
+	for (size_t i = e->scrollv; i < e->lines->len && i < e->rows; i++) {
+		Line l = e->lines->buff[i];
+		size_t len;
+		if (l.len  > e->cols) {
+			len = e->cols;
+		} else {
+			len = l.len - e->scrollh;
+		}
+		//fprintf(stderr, "writing %zu bytes from: e->text[%zu + %zu]\n", len - e->scrollh, l.start, e->scrollh);
+		WRITE(&e->text[l.start + e->scrollh], len);
+		//fprintf(stderr, "wrote: %.*s\n", (int)(len), &e->text[l.start + e->scrollh]);
 		WRITE_LIT("\r\n");
 	}
 	// draw cursor
 	char buff[32];
-	size_t len = snprintf(buff, sizeof(buff), "\033[%d;%df", e->cy + 1, e->cx + 1);
+	size_t len = snprintf(buff, sizeof(buff), "\033[%zu;%zuf", e->cy + 1, e->cx + 1);
 	WRITE(buff, len);
 }

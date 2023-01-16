@@ -8,6 +8,6 @@ typedef struct {
 
 
 void handle_output(Editor *e);
-int get_screen_size(int *c, int *r);
+int set_screen_size(Editor *e);
 
 

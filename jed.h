@@ -3,30 +3,32 @@
 #include <stddef.h>
 typedef struct {
 	size_t start;
-	int len;
+	size_t len;
 } Line;
 
 typedef struct lines {
-	int len;
-	int cap;
+	size_t len;
+	size_t cap;
 	Line *buff;
 } Lines;
 
 typedef struct {
-	int cx, cy;
+	size_t cx, cy;
 	bool quit;
 	char *text;
 	Lines *lines;
-	int scrollh, scrollv;
-	int rows, cols;
-	int real_cursor;
+	size_t scrollh, scrollv;
+	size_t rows, cols;
+	size_t real_cursor;
+	size_t str_len;
 } Editor;
 
 Lines *lines_new(void);
 void lines_free(Lines *ls);
 int lines_append(Lines *ls, Line l);
-int current_line(Editor *e);
-int current_column(Editor *e);
+size_t current_line(Editor *e);
+size_t current_column(Editor *e);
 void write_char(Editor *e, char c);
 void delete_char(Editor *e, bool inplace);
 void set_cursor(Editor *e);
+void editor_save_file(Editor *e);

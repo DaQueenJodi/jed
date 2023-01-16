@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <ctype.h>
-
+#include <string.h>
 
 
 typedef struct {
@@ -40,44 +40,40 @@ static Key read_input(void) {
 	}
 	return k;
 }
-static int curr_line;
+static size_t curr_line;
 static void move_up(Editor *e) {
-	if (e->cy == 0 && e->scrollv > 0) e->scrollv -= 1;
-			else if (e->cy > 0) e->cy -= 1;	
+	if (curr_line > 0) {
+		Line l = e->lines->buff[curr_line];
+		size_t col = e->real_cursor - l.start;
+		if (col > e->lines->buff[curr_line - 1].len) col = e->lines->buff[curr_line - 1].len;
+		e->real_cursor = e->lines->buff[curr_line - 1].start + col;
+	}
 }
 
 static void move_down(Editor *e) {
-	if (e->cy == e->rows - 1 && curr_line < e->lines->len - 2)
-		e->scrollv += 1;
-	else if (e->cy < e->lines->len) e->cy += 1;
+	if (curr_line < e->lines->len + 1) {
+		Line l = e->lines->buff[curr_line];
+	  size_t col = e->real_cursor - l.start;
+		if (col > e->lines->buff[curr_line + 1].len) col = e->lines->buff[curr_line + 1].len;
+		e->real_cursor = e->lines->buff[curr_line + 1].start + col;
+	}
 }
 
 static void move_left(Editor *e) {
-	if (e->cx == 0 && e->scrollh > 0) e->scrollh -= 1;
-	else if (e->cx > 0) e->cx -= 1;
+	if (e->real_cursor > 0) e->real_cursor -= 1;
 }
 
 static void move_right(Editor *e) {
-	int len = e->lines->buff[curr_line].len;
-	if (e->cx == e->cols - 1 && e->cx + e->scrollh < e->lines->buff[curr_line].len) e->scrollh += 1;
-	else if (e->cx < len)  e->cx += 1;
+	if (e->real_cursor < e->str_len) e->real_cursor += 1;
 }
 
 static void move_end(Editor *e) {
-
-			int len = e->lines->buff[curr_line].len;
-			int diff = len - e->cols;
-			if (diff <= 0)
-				e->cx = len;
-			else {
-				e->cx = len - diff;
-				e->scrollh = diff;
-		  }
+	Line *l = &e->lines->buff[curr_line];
+	e->real_cursor = l->start + l->len;
 }
 
 static void move_beginning(Editor *e) {
-			e->scrollh = 0;
-			e->cx = 0;
+	e->real_cursor = e->lines->buff[curr_line].start;
 }
 
 static void handle_movement(Editor *e, Key k) {
@@ -109,17 +105,11 @@ static void handle_movement(Editor *e, Key k) {
 		case CTRL('a'):
 			move_beginning(e);
 			break;
+		
 	}
+  }
 	
-	}
-int new_line = current_line(e);
-	if (curr_line != new_line && new_line < e->lines->len) {
-	  // snap cursor
-		int len = e->lines->buff[new_line].len;
-		if (e->cx > len) e->cx = len;
-		}
 }
-
 void handle_input(Editor *e) {
 	Key k = read_input();
 	if (k.is_special) {
@@ -141,6 +131,9 @@ void handle_input(Editor *e) {
 		case CTRL('a'):
 			handle_movement(e, k);
 			break;
+		case CTRL('s'):
+			editor_save_file(e);
+			break;
 		default:
 			// backspace
 			if (k.key == 127) {
@@ -148,11 +141,31 @@ void handle_input(Editor *e) {
 				move_left(e);
 		  } else {
 			write_char(e, k.key);
-			if (k.key == '\n')
-				handle_movement(e, (Key){.is_special = true, .key = MOVE_DOWN});
-			else
-				handle_movement(e, (Key){.is_special = true, .key = MOVE_RIGHT});
-			}
+			move_right(e);
+ 	  }
 	  }
 	}
+	set_cursor(e);
+	size_t line_num = current_line(e);
+	Line l = e->lines->buff[line_num];
+	
+	int diff = (e->real_cursor - l.start) - e->cols;
+	if (diff < 0) diff = 0;
+	e->scrollh = diff;
+	if (diff > 0) fprintf(stderr, "new scrollh: %zu\n", e->scrollh);
+	
+	diff = line_num - e->rows;
+	if (diff < 0) diff = 0;
+	e->scrollv = diff;
+	if (diff > 0) fprintf(stderr, "new scrollv: %zu\n", e->scrollv);
+	
+	/*
+	size_t new_line = current_line(e);
+	if (curr_line != new_line) {
+	  // snap cursor
+		Line l = e->lines->buff[new_line];
+		if ((e->real_cursor - l.start) > l.len) e->real_cursor = l.start + l.len;
+		}*/
+	fprintf(stderr, "real_cursor: %zu\n", e->real_cursor);
+	fprintf(stderr, "cx: %zu, cy: %zu\n", e->cx, e->cy);
 }
