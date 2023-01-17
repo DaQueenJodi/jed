@@ -16,17 +16,17 @@ int set_screen_size(Editor *e) {
 }
 
 
-static void clear_screen(void) {
+static void clear_screen(DynBuffer *screen) {
 	// clear screen
-	WRITE_LIT("\033[2J");
+	dyn_buffer_append(screen, "\033[2J", 4);
 	// put cursor at the top
-	WRITE_LIT("\033[;f");
+	dyn_buffer_append(screen, "\033[;f", 4);
 }
 
 void handle_output(Editor *e) {
-	clear_screen();
 	// draw text
 	DynBuffer *screen = dyn_buffer_new();
+	clear_screen(screen);
 	for (size_t i = e->scrollv; i < e->lines->len && i < e->rows; i++) {
 		Line l = e->lines->buff[i];
 		size_t len;
@@ -42,10 +42,9 @@ void handle_output(Editor *e) {
 			// tab
 			if (c == 9)
 				dyn_buffer_append(screen, "  ", 2);
-			
 		  else if (iscntrl(c)) {
-				char buff[2];
-				snprintf(buff, sizeof(buff), "^%c", c + '@');
+				char buff[3];
+				sprintf(buff, "^%c", c + '@');
 				dyn_buffer_append(screen, buff, 2);
 					
 			} else {

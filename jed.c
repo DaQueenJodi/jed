@@ -148,7 +148,7 @@ int main(int argc, char **argv) {
 	if (path) {
 		e.text = read_file(path);
 	} else {
-		e.text = strdup("Hello World\nAAAA\nUawau\n");
+		e.text = strdup("\n");
 	}
 	e.str_len = strlen(e.text);
 	e.lines = gen_lines(e.text, e.str_len);
@@ -251,15 +251,15 @@ void set_cursor(Editor *e) {
 	}
 	e->cy = lcount;
 	int line = current_line(e);
-	for (size_t counter = 0; counter < e->lines->buff[line].len; count++) {
-		char c = e->text[lines->buff[line].start + counter];
+	size_t pos = e->real_cursor - e->lines->buff[line].start;
+	e->cx = pos;
+	for (size_t counter = 0; counter < pos; counter++) {
+		char c = e->text[e->lines->buff[line].start + counter];
 		// tab
-		if (c == 9) {
-			e->cy += 2;
+		if (c == 9 || iscntrl(c)) {
+			e->cx += 1;
 		}
-		e->cy += 1;
 	}
-	
 }
 void editor_save_file(Editor *e) {
 	LOG("writing file\n");
