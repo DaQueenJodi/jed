@@ -1,8 +1,9 @@
-#include "input.h"
+#include "output.h"
 #include "util.h"
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <ctype.h>
 
 int set_screen_size(Editor *e) {
 	struct winsize ws;
@@ -25,6 +26,7 @@ static void clear_screen(void) {
 void handle_output(Editor *e) {
 	clear_screen();
 	// draw text
+	DynBuffer *screen = dyn_buffer_new();
 	for (size_t i = e->scrollv; i < e->lines->len && i < e->rows; i++) {
 		Line l = e->lines->buff[i];
 		size_t len;
@@ -33,13 +35,46 @@ void handle_output(Editor *e) {
 		} else {
 			len = l.len - e->scrollh;
 		}
-		//fprintf(stderr, "writing %zu bytes from: e->text[%zu + %zu]\n", len - e->scrollh, l.start, e->scrollh);
-		WRITE(&e->text[l.start + e->scrollh], len);
-		//fprintf(stderr, "wrote: %.*s\n", (int)(len), &e->text[l.start + e->scrollh]);
-		WRITE_LIT("\r\n");
+		for (size_t j = 0; j < len; j++) {
+			size_t index = l.start + e->scrollh + j;
+			//if (index >= e->str_len) continue;
+			char c = e->text[index];
+			// tab
+			if (c == 9)
+				dyn_buffer_append(screen, "  ", 2);
+			
+		  else if (iscntrl(c)) {
+				char buff[2];
+				snprintf(buff, sizeof(buff), "^%c", c + '@');
+				dyn_buffer_append(screen, buff, 2);
+					
+			} else {
+				dyn_buffer_append(screen, &c, 1);
+			}
+			
+		}
+		dyn_buffer_append(screen, "\r\n", 2);
 	}
 	// draw cursor
+	
 	char buff[32];
 	size_t len = snprintf(buff, sizeof(buff), "\033[%zu;%zuf", e->cy + 1, e->cx + 1);
-	WRITE(buff, len);
+	dyn_buffer_append(screen, buff, len);
+	WRITE(screen->text, screen->len);
+}
+
+DynBuffer *dyn_buffer_new(void) {
+	DynBuffer *db = malloc(sizeof(DynBuffer));
+
+	db->len = 0;
+	db->text = NULL;
+	
+	return db;
+}
+int dyn_buffer_append(DynBuffer *db, char *str, size_t len) {
+	db->text = realloc(db->text, db->len + len);
+	if (db->text == NULL) return -1;
+	memcpy(&db->text[db->len], str, len);
+	db->len += len;
+	return 0;
 }

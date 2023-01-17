@@ -251,7 +251,15 @@ void set_cursor(Editor *e) {
 	}
 	e->cy = lcount;
 	int line = current_line(e);
-	e->cx = e->real_cursor - e->lines->buff[line].start;
+	for (size_t counter = 0; counter < e->lines->buff[line].len; count++) {
+		char c = e->text[lines->buff[line].start + counter];
+		// tab
+		if (c == 9) {
+			e->cy += 2;
+		}
+		e->cy += 1;
+	}
+	
 }
 void editor_save_file(Editor *e) {
 	LOG("writing file\n");

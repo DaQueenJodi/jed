@@ -66,18 +66,27 @@ static void move_down(Editor *e) {
 	  size_t col = e->real_cursor - l.start;
 		if (col > e->lines->buff[curr_line + 1].len) col = e->lines->buff[curr_line + 1].len;
 	  e->real_cursor = e->lines->buff[curr_line + 1].start + col;
-		LOG( "moved from line %zu to line %zu\n", curr_line, curr_line + 1);
-	} else {
-		LOG( "not moving; end of buffer");
-	}
+		LOG("moved from line %zu to line %zu\n", curr_line, curr_line + 1);
+	} else LOG("not moving; end of buffer\n");
+	
 }
 
 static void move_left(Editor *e) {
+	
 	if (e->real_cursor > 0) e->real_cursor -= 1;
 }
 
 static void move_right(Editor *e) {
-	if (e->real_cursor < e->str_len) e->real_cursor += 1;
+	if (e->real_cursor == e->str_len - 1 && e->lines->buff[curr_line].len > 0) {
+		LOG("adding newline at the end\n");
+		// move cursor to the end
+		e->real_cursor = e->str_len;
+		write_char(e, '\n');
+	}
+	if (e->real_cursor < e->str_len - 1) {
+		e->real_cursor += 1;
+		LOG("moving right\n");
+	} else LOG("not moving right; end of buffer\n");
 }
 
 static void move_end(Editor *e) {
