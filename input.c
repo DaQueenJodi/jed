@@ -47,15 +47,28 @@ static void move_up(Editor *e) {
 		size_t col = e->real_cursor - l.start;
 		if (col > e->lines->buff[curr_line - 1].len) col = e->lines->buff[curr_line - 1].len;
 		e->real_cursor = e->lines->buff[curr_line - 1].start + col;
+		LOG("moved from line %zu to line %zu\n", curr_line, curr_line - 1);
+	} else {
+	  LOG("not moving; beginning of buffer\n");
 	}
 }
 
 static void move_down(Editor *e) {
-	if (curr_line < e->lines->len + 1) {
+	// if trying to go past last line, make a new line
+	if (curr_line == e->lines->len - 1 && e->lines->buff[curr_line].len > 0) {
+		LOG("adding newline at the end\n");
+		// move cursor to the end
+		e->real_cursor = e->str_len;
+		write_char(e, '\n');
+	}
+	if (curr_line < e->lines->len - 1) {
 		Line l = e->lines->buff[curr_line];
 	  size_t col = e->real_cursor - l.start;
 		if (col > e->lines->buff[curr_line + 1].len) col = e->lines->buff[curr_line + 1].len;
-		e->real_cursor = e->lines->buff[curr_line + 1].start + col;
+	  e->real_cursor = e->lines->buff[curr_line + 1].start + col;
+		LOG( "moved from line %zu to line %zu\n", curr_line, curr_line + 1);
+	} else {
+		LOG( "not moving; end of buffer");
 	}
 }
 
@@ -126,13 +139,15 @@ void handle_input(Editor *e) {
 		case CTRL('q'):
 			e->quit = true;
 			break;
-	
 		case CTRL('e'):
 		case CTRL('a'):
 			handle_movement(e, k);
 			break;
 		case CTRL('s'):
 			editor_save_file(e);
+			break;
+		case CTRL('d'):
+			delete_char(e, true);
 			break;
 		default:
 			// backspace
@@ -152,12 +167,12 @@ void handle_input(Editor *e) {
 	int diff = (e->real_cursor - l.start) - e->cols;
 	if (diff < 0) diff = 0;
 	e->scrollh = diff;
-	if (diff > 0) fprintf(stderr, "new scrollh: %zu\n", e->scrollh);
+	if (diff > 0) LOG("new scrollh: %zu\n", e->scrollh);
 	
 	diff = line_num - e->rows;
 	if (diff < 0) diff = 0;
 	e->scrollv = diff;
-	if (diff > 0) fprintf(stderr, "new scrollv: %zu\n", e->scrollv);
+	if (diff > 0) LOG("new scrollv: %zu\n", e->scrollv);
 	
 	/*
 	size_t new_line = current_line(e);
@@ -166,6 +181,6 @@ void handle_input(Editor *e) {
 		Line l = e->lines->buff[new_line];
 		if ((e->real_cursor - l.start) > l.len) e->real_cursor = l.start + l.len;
 		}*/
-	fprintf(stderr, "real_cursor: %zu\n", e->real_cursor);
-	fprintf(stderr, "cx: %zu, cy: %zu\n", e->cx, e->cy);
+	LOG("real_cursor: %zu\n", e->real_cursor);
+	LOG("cx: %zu, cy: %zu\n", e->cx, e->cy);
 }

@@ -97,7 +97,6 @@ Lines *gen_lines(char *buffer, size_t len) {
 		}
 		counter += 1;
 	}
-	lines_append(ls, (Line){.start = counter + 1, .len = 0}); // add empty line at the end always
 	return ls;
 }
 
@@ -197,11 +196,28 @@ size_t inline current_column(Editor *e) {
 	return e->scrollh + e->cx;
 }
 
+
 void delete_char(Editor *e, bool inplace) {
-	if (e->real_cursor == 0) return;
-	if (inplace) e->real_cursor += 1;
+	if (!inplace && e->real_cursor == 0) {
+		LOG( "can't delete nothingness\n");
+		return;
+	}
+	if (inplace && e->real_cursor + 1 >= e->str_len) {
+		LOG( "can't delete nothingness\n");
+		return;
+	}
 	size_t len = e->str_len;
-	memmove(&e->text[e->real_cursor - 1], &e->text[e->real_cursor], len - e->real_cursor);
+	
+		int offset1, offset2;
+		if (inplace) {
+			offset1 = +0;
+			offset2 = +1;
+		} else {
+			offset1 = -1;
+			offset2 = +0;
+		}
+		memmove(&e->text[e->real_cursor + offset1], &e->text[e->real_cursor + offset2], len - e->real_cursor);
+	
 	e->text[len - 1] = '\0';
 	lines_free(e->lines);
 	e->str_len -= 1;
@@ -209,11 +225,15 @@ void delete_char(Editor *e, bool inplace) {
 }
 
 void write_char(Editor *e, char c) {
+	LOG("writing character '%c'\n", c);
 	size_t len = e->str_len;
 	e->text = realloc(e->text, len + 1 + 1);
 	if (e->text == NULL)
 		DIE("realloc");
-	memmove(&e->text[e->real_cursor + 1], &e->text[e->real_cursor], len - e->real_cursor);
+	// only memmove if needed
+	if (e->real_cursor != len + 1) {
+     memmove(&e->text[e->real_cursor + 1], &e->text[e->real_cursor], len - e->real_cursor);
+	}
 	e->text[e->real_cursor] = c;
 	e->text[len + 1] = '\0';
 	lines_free(e->lines);
@@ -225,7 +245,7 @@ void set_cursor(Editor *e) {
 	size_t lcount = 0;
 	for (size_t counter = 0; counter < e->real_cursor; counter++) {
 		char c = e->text[counter];
-		if (c == '\n' || c == '\0') {
+		if (c == '\n') {
 			lcount += 1;
 		}
 	}
@@ -234,6 +254,6 @@ void set_cursor(Editor *e) {
 	e->cx = e->real_cursor - e->lines->buff[line].start;
 }
 void editor_save_file(Editor *e) {
-	fprintf(stderr, "writing file\n");
+	LOG("writing file\n");
 	write_file("welp.bak", e->text, e->str_len);
 }
