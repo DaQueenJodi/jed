@@ -5,39 +5,21 @@
 #include <ctype.h>
 #include <string.h>
 
-
 typedef struct {
-	bool is_special;
-	int key;
+	char chars[4];
 } Key;
+typedef struct {
+	Key key;
+	void (*func)(Editor *e);
+} Binding;
+
+
 
 static Key read_input(void) {
 	Key k;
-	k.is_special = true;
-	char c;
 	// wait until we something
-	while (READ(&c, 1) == 0);
-	switch (c) {
-	case CTRL('b'):
-		k.key = MOVE_LEFT;
-		break;
-	case CTRL('n'):
-		k.key = MOVE_DOWN;
-		break;
-	case CTRL('p'):
-		k.key = MOVE_UP;
-		break;
-	case CTRL('f'):
-		k.key = MOVE_RIGHT;
-		break;
-	case '\r':
-		k.is_special = false;
-		k.key = '\n';
-		break;
-	 default:
-		 k.is_special = false;
-		 k.key = c;
-	}
+	while (READ(k.chars, 4) == 0);
+	if (k.chars[0] == '\r') k.chars[0] = '\n';
 	return k;
 }
 static size_t curr_line;
@@ -89,86 +71,35 @@ static void move_right(Editor *e) {
 	} else LOG("not moving right; end of buffer\n");
 }
 
-static void move_end(Editor *e) {
-	Line *l = &e->lines->buff[curr_line];
-	e->real_cursor = l->start + l->len;
+void quit(Editor *e) {
+	e->quit = true;
 }
 
-static void move_beginning(Editor *e) {
-	e->real_cursor = e->lines->buff[curr_line].start;
-}
+#include "config.h"
 
-static void handle_movement(Editor *e, Key k) {
-	curr_line = current_line(e);
-	if (k.is_special) {
-		switch ((SpecialKey)k.key) {
-		case MOVE_DOWN: {
-			move_down(e);
-			break;
-		}
-		case MOVE_UP: {
-			move_up(e);
-			break;
-		}
-		case MOVE_LEFT:
-			move_left(e);
-			break;
-		case MOVE_RIGHT: {
-			move_right(e);
-		  break;
-		}
-		}
-	} else {
-		switch ((char)k.key) {
-		case CTRL('e'): {
-			move_end(e);
-			break;
-		}
-		case CTRL('a'):
-			move_beginning(e);
-			break;
-		
-	}
-  }
-	
-}
+#define STRCMP(str1, str2, count) memcmp((str1), (str2), (count)) == 0
 void handle_input(Editor *e) {
+	curr_line = current_line(e);
 	Key k = read_input();
-	if (k.is_special) {
-		switch ((SpecialKey)k.key) {
-		case MOVE_DOWN:
-		case MOVE_UP:
-		case MOVE_LEFT:
-		case MOVE_RIGHT:
-			handle_movement(e, k);
-			break;
+	bool found = false;
+	for (size_t i = 0; i < ARRLEN(keys); i++) {
+		if (STRCMP(keys[i].key.chars, k.chars, 1)) {
+			keys[i].func(e);
+			found = true;
 		}
-	} else {
-		switch ((char)k.key) {
-		case CTRL('q'):
-			e->quit = true;
-			break;
-		case CTRL('e'):
-		case CTRL('a'):
-			handle_movement(e, k);
-			break;
-		case CTRL('s'):
-			editor_save_file(e);
-			break;
-		case CTRL('d'):
-			delete_char(e, true);
-			break;
-		default:
-			// backspace
-			if (k.key == 127) {
-				delete_char(e, false);
-				move_left(e);
-		  } else {
-			write_char(e, k.key);
-			move_right(e);
- 	  }
-	  }
 	}
+	if (!found) {
+		// backspace
+		if (k.chars[0] == 127) {
+			delete_char(e, false);
+			move_left(e);
+	  } else {
+		write_char(e, k.chars[0]);
+		move_right(e);
+ 	 }
+	
+	}
+
 	set_cursor(e);
 	size_t line_num = current_line(e);
 	Line l = e->lines->buff[line_num];
@@ -182,14 +113,7 @@ void handle_input(Editor *e) {
 	if (diff < 0) diff = 0;
 	e->scrollv = diff;
 	if (diff > 0) LOG("new scrollv: %zu\n", e->scrollv);
-	
-	/*
-	size_t new_line = current_line(e);
-	if (curr_line != new_line) {
-	  // snap cursor
-		Line l = e->lines->buff[new_line];
-		if ((e->real_cursor - l.start) > l.len) e->real_cursor = l.start + l.len;
-		}*/
+
 	LOG("real_cursor: %zu\n", e->real_cursor);
 	LOG("cx: %zu, cy: %zu\n", e->cx, e->cy);
 }

@@ -7,3 +7,4 @@
 #define WRITE_LIT(lit) WRITE(lit, sizeof(lit) - 1)
 #define LOG(...) fprintf(stderr, __VA_ARGS__)
 #define CTRL(c) ((c) & 0x1f)
+#define ARRLEN(arr) (sizeof((arr)) / sizeof((arr)[0]))

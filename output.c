@@ -24,9 +24,11 @@ static void clear_screen(DynBuffer *screen) {
 }
 
 void handle_output(Editor *e) {
-	// draw text
 	DynBuffer *screen = dyn_buffer_new();
+	// hide cursor to avoid possible tearing effect
+	dyn_buffer_append(screen, "\033[?25l", 6);
 	clear_screen(screen);
+	// draw text
 	for (size_t i = e->scrollv; i < e->lines->len && i < e->rows; i++) {
 		Line l = e->lines->buff[i];
 		size_t len;
@@ -59,7 +61,10 @@ void handle_output(Editor *e) {
 	char buff[32];
 	size_t len = snprintf(buff, sizeof(buff), "\033[%zu;%zuf", e->cy + 1, e->cx + 1);
 	dyn_buffer_append(screen, buff, len);
+	// restore cursor
+	dyn_buffer_append(screen, "\033[?25h", 6);
 	WRITE(screen->text, screen->len);
+	dyn_buffer_free(screen);
 }
 
 DynBuffer *dyn_buffer_new(void) {
@@ -76,4 +81,9 @@ int dyn_buffer_append(DynBuffer *db, char *str, size_t len) {
 	memcpy(&db->text[db->len], str, len);
 	db->len += len;
 	return 0;
+}
+
+void dyn_buffer_free(DynBuffer *db) {
+	free(db->text);
+	free(db);
 }
