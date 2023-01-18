@@ -1,4 +1,5 @@
 jed
+config.h
 *.txt
 *.bak
 *.log

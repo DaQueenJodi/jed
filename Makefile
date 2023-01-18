@@ -1,13 +1,24 @@
-SRCS=$(shell find -name "*.c")
-DEBUG=-fsanitize=address,leak,undefined -ggdb
-CFLAGS=-Wextra -Wall -Wpedantic $(DEBUG)
-LDFLAGS=
-CC=clang
-NAME=jed
+# jed
+# See LICENSE file for license details.
 
-all: $(NAME)
-$(NAME): $(SRCS) config.h
-	$(CC) $(CFLAGS) $(LDFLAGS) $(SRCS) -o $(NAME)
+include config.mk
 
-run: $(NAME)
-	./$(NAME)
+SRC = input.c jed.c output.c
+BIN = jed
+
+all: ${BIN}
+
+config.h:
+	cp config.def.h $@
+
+${BIN}: ${SRCS} config.h
+	${CC} ${CFLAGS} ${LDFLAGS} ${SRC} -o ${BIN}
+
+run: ${BIN}
+	./${BIN}
+
+clean:
+	rm -r ${BIN}
+
+install: ${BIN}
+	cp jed ${PREFIX}/bin
