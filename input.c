@@ -22,20 +22,22 @@ static Key read_input(void) {
 	if (k.chars[0] == '\r') k.chars[0] = '\n';
 	return k;
 }
-static size_t curr_line;
 static void move_up(Editor *e) {
+	size_t curr_line = current_line(e);
 	if (curr_line > 0) {
 		Line l = e->lines->buff[curr_line];
 		size_t col = e->real_cursor - l.start;
 		if (col > e->lines->buff[curr_line - 1].len) col = e->lines->buff[curr_line - 1].len;
 		e->real_cursor = e->lines->buff[curr_line - 1].start + col;
 		LOG("moved from line %zu to line %zu\n", curr_line, curr_line - 1);
+		run_after_move(e);
 	} else {
 	  LOG("not moving; beginning of buffer\n");
 	}
 }
 
 static void move_down(Editor *e) {
+	size_t curr_line = current_line(e);
 	// if trying to go past last line, make a new line
 	if (curr_line == e->lines->len - 1 && e->lines->buff[curr_line].len > 0) {
 		LOG("adding newline at the end\n");
@@ -49,16 +51,17 @@ static void move_down(Editor *e) {
 		if (col > e->lines->buff[curr_line + 1].len) col = e->lines->buff[curr_line + 1].len;
 	  e->real_cursor = e->lines->buff[curr_line + 1].start + col;
 		LOG("moved from line %zu to line %zu\n", curr_line, curr_line + 1);
+		run_after_move(e);
 	} else LOG("not moving; end of buffer\n");
-	
 }
 
 static void move_left(Editor *e) {
-	
 	if (e->real_cursor > 0) e->real_cursor -= 1;
+	run_after_move(e);
 }
 
 static void move_right(Editor *e) {
+	size_t curr_line = current_line(e);
 	if (e->real_cursor == e->str_len - 1 && e->lines->buff[curr_line].len > 0) {
 		LOG("adding newline at the end\n");
 		// move cursor to the end
@@ -68,6 +71,7 @@ static void move_right(Editor *e) {
 	if (e->real_cursor < e->str_len - 1) {
 		e->real_cursor += 1;
 		LOG("moving right\n");
+		run_after_move(e);
 	} else LOG("not moving right; end of buffer\n");
 }
 
@@ -77,9 +81,8 @@ void quit(Editor *e) {
 
 #include "config.h"
 
-#define STRCMP(str1, str2, count) memcmp((str1), (str2), (count)) == 0
+
 void handle_input(Editor *e) {
-	curr_line = current_line(e);
 	Key k = read_input();
 	bool found = false;
 	for (size_t i = 0; i < ARRLEN(keys); i++) {
@@ -99,21 +102,4 @@ void handle_input(Editor *e) {
  	 }
 	
 	}
-
-	set_cursor(e);
-	size_t line_num = current_line(e);
-	Line l = e->lines->buff[line_num];
-	
-	int diff = (e->real_cursor - l.start) - e->cols;
-	if (diff < 0) diff = 0;
-	e->scrollh = diff;
-	if (diff > 0) LOG("new scrollh: %zu\n", e->scrollh);
-	
-	diff = line_num - e->rows;
-	if (diff < 0) diff = 0;
-	e->scrollv = diff;
-	if (diff > 0) LOG("new scrollv: %zu\n", e->scrollv);
-
-	LOG("real_cursor: %zu\n", e->real_cursor);
-	LOG("cx: %zu, cy: %zu\n", e->cx, e->cy);
 }

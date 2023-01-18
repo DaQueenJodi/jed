@@ -87,19 +87,35 @@ char *read_file(char *path) {
 	return buffer;
 }
 
+Words *gen_words(char *text, size_t len) {
+	Words *ws = words_new();
+	Word w;
+	w.start = 0;
+	for (size_t counter = 0; counter < len; counter++) {
+		char c = text[counter];
+		if (c == '\n' || c == ' ') {
+			size_t len = counter - w.start;
+			if (len > 0) {
+				w.len = len;
+				if (words_append(ws, w) < 0) return NULL;
+				w.start = counter + 1;
+			}
+		}
+	}
+	return ws;
+}
 
 Lines *gen_lines(char *buffer, size_t len) {
 	Lines *ls = lines_new();
 	Line l;
-	size_t counter = 0; // empty files should still have one line
+	
 	l.start = 0;
-	while (counter < len) {
+	for  (size_t counter = 0; counter < len; counter++) {
 		if (buffer[counter] == '\n') {
 			l.len = (counter - l.start);
-			lines_append(ls, l);
+			if (lines_append(ls, l) < 0) return NULL;
 			l.start = counter + 1;
 		}
-		counter += 1;
 	}
 	return ls;
 }
@@ -155,13 +171,15 @@ int main(int argc, char **argv) {
 		e.text = strdup("\n");
 	}
 	e.str_len = strlen(e.text);
+	e.words = gen_words(e.text, e.str_len);
 	e.lines = gen_lines(e.text, e.str_len);
-	
+
 	while (!e.quit) {
 		handle_output(&e);
 		handle_input(&e);
 	}
 	lines_free(e.lines);
+	words_free(e.words);
 	free(e.text);
 }
 
@@ -224,8 +242,10 @@ void delete_char(Editor *e, bool inplace) {
 	
 	e->text[len - 1] = '\0';
 	lines_free(e->lines);
+	words_free(e->words);
 	e->str_len -= 1;
 	e->lines = gen_lines(e->text, e->str_len);
+	e->words = gen_words(e->text, e->str_len);
 }
 
 void write_char(Editor *e, char c) {
@@ -241,8 +261,10 @@ void write_char(Editor *e, char c) {
 	e->text[e->real_cursor] = c;
 	e->text[len + 1] = '\0';
 	lines_free(e->lines);
+	words_free(e->words);
 	e->str_len += 1;
 	e->lines = gen_lines(e->text, e->str_len);
+	e->words = gen_words(e->text, e->str_len);
 }
 
 void set_cursor(Editor *e) {
@@ -268,4 +290,47 @@ void set_cursor(Editor *e) {
 void editor_save_file(Editor *e) {
 	LOG("writing file\n");
 	write_file("welp.bak", e->text, e->str_len);
+}
+
+
+Words *words_new(void) {
+	Words *ws = malloc(sizeof(Words));
+	ws->cap = 5;
+	ws->len = 0;
+	ws->buff = malloc(sizeof(Word) * ws->cap);
+	return ws;
+}
+
+int words_append(Words *ws, Word w) {
+	if (ws->len == ws->cap) {
+		ws->cap *= 2;
+		ws->buff = realloc(ws->buff, ws->cap * sizeof(Word));
+		if (ws->buff == NULL) return -1;
+	}
+	ws->buff[ws->len++] = w;
+	return 0;
+}
+
+void words_free(Words *ws) {
+	free(ws->buff);
+	free(ws);
+}
+
+void run_after_move(Editor *e) {
+	set_cursor(e);
+	size_t line_num = current_line(e);
+	Line l = e->lines->buff[line_num];
+	
+	int diff = (e->real_cursor - l.start) - e->cols;
+	if (diff < 0) diff = 0;
+	e->scrollh = diff;
+	if (diff > 0) LOG("new scrollh: %zu\n", e->scrollh);
+	
+	diff = line_num - e->rows;
+	if (diff < 0) diff = 0;
+	e->scrollv = diff;
+	if (diff > 0) LOG("new scrollv: %zu\n", e->scrollv);
+
+	LOG("real_cursor: %zu\n", e->real_cursor);
+	LOG("cx: %zu, cy: %zu\n", e->cx, e->cy);
 }

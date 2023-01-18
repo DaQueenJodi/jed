@@ -8,3 +8,6 @@
 #define LOG(...) fprintf(stderr, __VA_ARGS__)
 #define CTRL(c) ((c) & 0x1f)
 #define ARRLEN(arr) (sizeof((arr)) / sizeof((arr)[0]))
+#include <string.h>
+#define STRCMP(str1, str2, count) memcmp((str1), (str2), (count)) == 0
+#define STRLITCMP(str1, lit) memcmp((str1), (lit), sizeof((lit)) - 1) == 0
