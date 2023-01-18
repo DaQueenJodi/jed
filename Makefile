@@ -20,5 +20,5 @@ run: ${BIN}
 clean:
 	rm -r ${BIN}
 
-install: $(BIN)
-	cp jed $(PREFIX)/bin
+install: ${BIN}
+	cp jed ${PREFIX}/bin
