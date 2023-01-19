@@ -7,6 +7,7 @@
 
 typedef struct {
 	char chars[4];
+	size_t len;
 } Key;
 typedef struct {
 	Key key;
@@ -18,7 +19,7 @@ typedef struct {
 static Key read_input(void) {
 	Key k;
 	// wait until we something
-	while (READ(k.chars, 4) == 0);
+	while ((k.len = READ(k.chars, 4)) == 0);
 	if (k.chars[0] == '\r') k.chars[0] = '\n';
 	return k;
 }
@@ -86,7 +87,8 @@ void handle_input(Editor *e) {
 	Key k = read_input();
 	bool found = false;
 	for (size_t i = 0; i < ARRLEN(keys); i++) {
-		if (STRCMP(keys[i].key.chars, k.chars, 1)) {
+		if (keys[i].key.len != k.len) continue;
+		if (STRCMP(keys[i].key.chars, k.chars, k.len)) {
 			keys[i].func(e);
 			found = true;
 		}

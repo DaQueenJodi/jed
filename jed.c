@@ -67,7 +67,7 @@ char *read_file(char *path) {
 	if (fseek(f, 0, SEEK_END) < 0) {
 		DIE("fseek");
 	}
-	size_t len = ftell(f);
+	int len = ftell(f);
 	if (len < 0) {
 		DIE("ftell");
 	}
@@ -87,19 +87,35 @@ char *read_file(char *path) {
 	return buffer;
 }
 
+
+static const char WORD_DELIMINATORS[] = {' ', '\n', 9, '(', ')', '[', ']', ';', ':'};
 Words *gen_words(char *text, size_t len) {
 	Words *ws = words_new();
 	Word w;
-	w.start = 0;
+	
 	for (size_t counter = 0; counter < len; counter++) {
 		char c = text[counter];
-		if (c == '\n' || c == ' ') {
-			size_t len = counter - w.start;
-			if (len > 0) {
-				w.len = len;
-				if (words_append(ws, w) < 0) return NULL;
-				w.start = counter + 1;
+		bool found = false;
+		for (size_t i = 0; i < ARRLEN(WORD_DELIMINATORS); i++) {
+			if (c == WORD_DELIMINATORS[i]) {
+				found = true;
+				break;
 			}
+		}
+		if (found) continue;
+		w.start = counter;
+		for (; counter < len; counter++) {
+			char c = text[counter];
+			size_t found = false;
+			for (size_t i = 0; i < ARRLEN(WORD_DELIMINATORS); i++) {
+				if (c == WORD_DELIMINATORS[i]) {
+					w.len = counter - w.start;
+					words_append(ws, w);
+					found = true;
+					break;
+				}
+			}
+			if (found) break;
 		}
 	}
 	return ws;
@@ -211,10 +227,10 @@ void lines_free(Lines *ls) {
 	free(ls);
 }
 
-size_t inline current_line(Editor *e) {
+inline size_t current_line(Editor *e) {
 	return e->scrollv + e->cy;
 }
-size_t inline current_column(Editor *e) {
+inline size_t current_column(Editor *e) {
 	return e->scrollh + e->cx;
 }
 

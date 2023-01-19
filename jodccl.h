@@ -273,6 +273,7 @@ static const char *type_to_str(JCLTypes type) {
   case JCL_STRING:
     return "string";
   }
+  assert(0 && "unreachable");
 }
 
 void jcl_print_error(JCLError err) {
