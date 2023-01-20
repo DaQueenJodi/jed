@@ -69,6 +69,6 @@ const Binding keys[] = {
   {KEY(CTRL('s')), save_the_file},
 	// Electric keys
 	// automatically indent to outer level
-	{KEY('\n'), electric_return},
+	//{KEY('\n'), electric_return},
 
 };

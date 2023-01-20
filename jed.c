@@ -228,7 +228,7 @@ void lines_free(Lines *ls) {
 }
 
 inline size_t current_line(Editor *e) {
-	return e->scrollv + e->cy;
+		return e->cy;
 	//return e->cy;
 }
 
@@ -293,7 +293,11 @@ void set_cursor(Editor *e) {
 	}
 	e->cy = lcount;
 	size_t line = current_line(e);
-	size_t pos = e->real_cursor - e->lines->buff[line].start;
+	size_t start = e->lines->buff[line].start;
+	size_t pos = e->real_cursor - start;
+	if (pos > 1000) {
+		sleep(1);
+	}
 	LOG("line_start: %zu\n", e->lines->buff[line].start);
 	LOG("curr_line: %zu\n", line);
 	LOG("lines_len %zu\n", e->lines->len);
@@ -338,19 +342,21 @@ void words_free(Words *ws) {
 
 void run_after_move(Editor *e) {
 	set_cursor(e);
+	/*
 	size_t line_num = current_line(e);
 	Line l = e->lines->buff[line_num];
-	/*
-	int diff = (e->real_cursor - l.start) - e->cols;
+
+	int diff = e->real_cursor - l.start - e->cols;
 	if (diff < 0) diff = 0;
 	e->scrollh = diff;
 	if (diff > 0) LOG("new scrollh: %zu\n", e->scrollh);
 	
-	diff = line_num - e->rows;
+	diff = (line_num + 1) - e->rows;
 	if (diff < 0) diff = 0;
 	e->scrollv = diff;
 	if (diff > 0) LOG("new scrollv: %zu\n", e->scrollv);
-	*/
+	
 	LOG("real_cursor: %zu\n", e->real_cursor);
 	LOG("cx: %zu, cy: %zu\n", e->cx, e->cy);
+	*/
 }

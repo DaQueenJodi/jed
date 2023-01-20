@@ -245,8 +245,7 @@ void handle_output(Editor *e) {
   clear_screen(screen);
   // draw text
 	
-  for (size_t i = e->scrollv; i < e->lines->len && i < e->rows; i++) {
-   
+  for (size_t i = e->scrollv; i < e->lines->len && i < e->rows + e->scrollv; i++) {
     Line l = e->lines->buff[i];
     size_t len;
     if (l.len > e->cols) {
@@ -271,6 +270,7 @@ void handle_output(Editor *e) {
         dyn_buffer_append(screen, &c, 1);
       }
     }
+		LOG("len: %zu\n", screen->len);
     dyn_buffer_append(screen, "\r\n", 2);
   }
   // draw cursor

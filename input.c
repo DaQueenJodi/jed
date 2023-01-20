@@ -40,12 +40,14 @@ static void move_up(Editor *e) {
 static void move_down(Editor *e) {
 	size_t curr_line = current_line(e);
 	// if trying to go past last line, make a new line
+	/*
 	if (curr_line == e->lines->len - 1 && e->lines->buff[curr_line].len > 0) {
 		LOG("adding newline at the end\n");
 		// move cursor to the end
 		e->real_cursor = e->str_len;
 		write_char(e, '\n');
 	}
+	*/
 	if (curr_line < e->lines->len - 1) {
 		Line l = e->lines->buff[curr_line];
 	  size_t col = e->real_cursor - l.start;
@@ -67,7 +69,7 @@ static void move_right(Editor *e) {
 		LOG("adding newline at the end\n");
 		// move cursor to the end
 		e->real_cursor = e->str_len;
-		write_char(e, '\n');
+		//write_char(e, '\n');
 	}
 	if (e->real_cursor < e->str_len - 1) {
 		e->real_cursor += 1;
