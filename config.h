@@ -1,7 +1,5 @@
-#define COMMENT_COLOR = {112, 128, 153};
-#define STRING_COLOR = {240, 230, 140};
-
-
+#define C_SUPPORT 1
+#define MAKE_SUPPORT 1
 void move_end(Editor *e) {
 	size_t curr_line = current_line(e);
 	Line *l = &e->lines->buff[curr_line];
@@ -18,6 +16,40 @@ void delete_char_inplace(Editor *e) {
 	run_after_move(e);
 }
 
+void delete_after(Editor *e) {
+	Line l = e->lines->buff[current_line(e)];
+	size_t col = e->real_cursor - l.start;
+	for (size_t i = 0; i < l.len - col; i++) {
+		delete_char_inplace(e);
+		run_after_move(e);
+	}
+}
+
+void electric_return(Editor *e) {
+	Line l = e->lines->buff[current_line(e)];
+	write_char(e, '\n');
+	move_right(e);
+	
+	size_t counter;
+	char *chars = malloc(l.len);
+	for (counter = 0; counter < l.len; counter++) {
+		char c = e->text[l.start + counter];
+		if (!isblank(c))
+			break;
+		chars[counter] = c;
+	}
+	for (size_t i = 0 ; i < counter; i++) {
+		write_char(e, chars[i]);
+		move_right(e);
+	}
+	run_after_move(e);
+	free(chars);
+}
+
+
+void save_the_file(Editor *e) {
+  editor_save_file(e);
+}
 
 static const char quit_key = CTRL('q');
 
@@ -31,4 +63,12 @@ const Binding keys[] = {
 	{KEY(CTRL('f')), move_right},
 	{KEY(CTRL('e')), move_end},
 	{KEY(CTRL('a')), move_start},
+	{KEY(CTRL('d')), delete_char_inplace},
+	{KEY(CTRL('k')), delete_after},
+	
+  {KEY(CTRL('s')), save_the_file},
+	// Electric keys
+	// automatically indent to outer level
+	{KEY('\n'), electric_return},
+
 };

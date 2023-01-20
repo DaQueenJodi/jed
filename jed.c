@@ -229,9 +229,7 @@ void lines_free(Lines *ls) {
 
 inline size_t current_line(Editor *e) {
 	return e->scrollv + e->cy;
-}
-inline size_t current_column(Editor *e) {
-	return e->scrollh + e->cx;
+	//return e->cy;
 }
 
 
@@ -280,7 +278,9 @@ void write_char(Editor *e, char c) {
 	words_free(e->words);
 	e->str_len += 1;
 	e->lines = gen_lines(e->text, e->str_len);
+	if (e->lines == NULL) DIE("failed to allocate lines");
 	e->words = gen_words(e->text, e->str_len);
+	if (e->words == NULL) DIE("failed to allocate words");
 }
 
 void set_cursor(Editor *e) {
@@ -292,8 +292,12 @@ void set_cursor(Editor *e) {
 		}
 	}
 	e->cy = lcount;
-	int line = current_line(e);
+	size_t line = current_line(e);
 	size_t pos = e->real_cursor - e->lines->buff[line].start;
+	LOG("line_start: %zu\n", e->lines->buff[line].start);
+	LOG("curr_line: %zu\n", line);
+	LOG("lines_len %zu\n", e->lines->len);
+	LOG("pos: %zu\n", pos);
 	e->cx = pos;
 	for (size_t counter = 0; counter < pos; counter++) {
 		char c = e->text[e->lines->buff[line].start + counter];
@@ -305,7 +309,7 @@ void set_cursor(Editor *e) {
 }
 void editor_save_file(Editor *e) {
 	LOG("writing file\n");
-	write_file("welp.bak", e->text, e->str_len);
+	write_file("welp.c", e->text, e->str_len);
 }
 
 
@@ -336,7 +340,7 @@ void run_after_move(Editor *e) {
 	set_cursor(e);
 	size_t line_num = current_line(e);
 	Line l = e->lines->buff[line_num];
-	
+	/*
 	int diff = (e->real_cursor - l.start) - e->cols;
 	if (diff < 0) diff = 0;
 	e->scrollh = diff;
@@ -346,7 +350,7 @@ void run_after_move(Editor *e) {
 	if (diff < 0) diff = 0;
 	e->scrollv = diff;
 	if (diff > 0) LOG("new scrollv: %zu\n", e->scrollv);
-
+	*/
 	LOG("real_cursor: %zu\n", e->real_cursor);
 	LOG("cx: %zu, cy: %zu\n", e->cx, e->cy);
 }

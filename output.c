@@ -21,8 +21,8 @@ static void clear_screen(DynBuffer *screen) {
   // put cursor at the top
   dyn_buffer_append(screen, "\033[;f", 4);
 }
-
-static const char *keywords[] = {"#include",
+//#if C_SUPPORT == 1
+static const char *c_keywords[] = {"#include",
                                  "#define",
                                  "for",
                                  "if",
@@ -34,7 +34,6 @@ static const char *keywords[] = {"#include",
                                  "bool",
                                  "size_t",
                                  "char",
-                                 "*",
                                  "return",
                                  "void",
                                  "#pragma",
@@ -49,7 +48,7 @@ static const char *keywords[] = {"#include",
                                  "uint16_t",
                                  "uint32_t",
                                  "uint64_t",
-                                 "int8_t"
+                                 "int8_t",
                                  "int16_t",
                                  "int32_t",
                                  "int64_t",
@@ -68,18 +67,15 @@ static const char *keywords[] = {"#include",
                                  "goto",
                                  "sizeof"};
 
-static const char *operators[] = {
+static const char *c_operators[] = {
     // double chars are listed first becuase of the way the comparisons are done
     "+=", "-=", "*=", "/=", "==", "!=", "&&", "||", "&=", "|=", "^=",
 
     "=",  "+",  "-",  "*",  "/",  "!",  "|",  "&",  "^"};
-static const char LINE_COMMENT[] = "//";
-static const char START_BLOCK_COMMENT[] = "/*";
-static const char END_BLOCK_COMMENT[] = "*/";
 
-int is_operator(char *t, size_t len) {
-  for (size_t i = 0; i < ARRLEN(operators); i++) {
-    const char *cmp = operators[i];
+static int c_is_operator(char *t, size_t len) {
+  for (size_t i = 0; i < ARRLEN(c_operators); i++) {
+    const char *cmp = c_operators[i];
     size_t cmp_len = strlen(cmp);
     if (len >= cmp_len && STRCMP(t, cmp, cmp_len))
       return cmp_len;
@@ -87,31 +83,170 @@ int is_operator(char *t, size_t len) {
   return 0;
 }
 
-bool is_keyword(char *t, size_t len) {
-  for (size_t i = 0; i < ARRLEN(keywords); i++) {
-    const char *cmp = keywords[i];
+static int c_is_keyword(char *t, size_t len) {
+  for (size_t i = 0; i < ARRLEN(c_keywords); i++) {
+    const char *cmp = c_keywords[i];
     size_t cmp_len = strlen(cmp);
     if (len == cmp_len && STRCMP(t, cmp, cmp_len)) {
-      return true;
+      return cmp_len;
     }
   }
-  return false;
+  return 0;
+}
+static bool c_is_quote = false;
+static bool c_is_block_comment = false;
+static bool c_is_line_comment = false;
+static size_t c_highlight_next = 0;
+void c_handle_highlighting(DynBuffer *screen, Editor *e, Line line, size_t col) {
+	// if start of line
+	if (col == 0)  {
+		c_is_line_comment = false;
+	}
+	
+	char *curr = &e->text[line.start + col];
+	if (c_is_block_comment) {
+		if (STRCMP(curr, "*/", 2)) {
+			c_is_block_comment = false;
+			c_highlight_next = 2;
+		}
+	} else if (!c_is_line_comment) {
+		if (*curr == '"') {
+			if (c_is_quote) {
+				c_is_quote = false;
+				c_highlight_next = 1;
+			} else {
+				c_is_quote = true;
+			}
+		}
+		else if (*curr == '\'') {
+			if (!c_is_quote) c_highlight_next = 1;
+		}
+		else if (STRCMP(curr, "//", 2)) {
+			c_is_line_comment = true;
+		}
+		else if (STRCMP(curr, "/*", 2)) {
+			c_is_block_comment = true;
+		}
+		else if (line.len > 8 && STRCMP(&e->text[line.start], "#include", 8) && *curr == '<')
+			c_is_quote = true;
+		else if (line.len > 8 && STRCMP(&e->text[line.start], "#include", 8) && *curr == '>') {
+		  c_is_quote = false;
+			c_highlight_next = 1;
+		}
+			
+		else {
+			size_t op_len = c_is_operator(curr, line.len - col);
+			if (op_len > 0) {
+				dyn_buffer_append(screen, "\033[0;31m", 7);
+				c_highlight_next = op_len;
+			}
+			else {
+				for (size_t i = 0; i < e->words->len; i++) {
+					Word w = e->words->buff[i];
+					if (w.start == line.start + col) {
+						size_t kw_len = c_is_keyword(curr, w.len);
+						if (kw_len > 0) {
+							dyn_buffer_append(screen, "\033[0;31m", 7);
+							c_highlight_next = kw_len;
+						}
+					}
+				}
+			}
+		}
+		
+	}
+  if (c_is_block_comment || c_is_line_comment)
+    dyn_buffer_append(screen, "\033[0;90m", 7);
+  else if (c_is_quote)
+    dyn_buffer_append(screen, "\033[0;33m", 7);
+  else if (c_highlight_next == 0) {
+    dyn_buffer_append(screen, "\033[0m", 4);
+  } else
+     c_highlight_next -= 1;	
 }
 
-void handle_output(Editor *e) {
+//#endif //C_SUPPORT
+//#if MAKE_SUPPORT == 1
+static const char *make_keywords[] = {
+	"include", "ifeq", "else", "endif"
+};
+static const char *make_operators[] = {
+	"::=", ":::=",
+	"?=", "!=",
+	"=", "$", ":", "(", ")"
+};
+static int make_is_operator(char *t, size_t len) {
+  for (size_t i = 0; i < ARRLEN(make_operators); i++) {
+    const char *cmp = make_operators[i];
+    size_t cmp_len = strlen(cmp);
+    if (len >= cmp_len && STRCMP(t, cmp, cmp_len))
+      return cmp_len;
+  }
+  return 0;
+}
 
-  bool is_quote = false;
-  bool is_block_comment = false;
-  bool is_line_comment = false;
+static int make_is_keyword(char *t, size_t len) {
+  for (size_t i = 0; i < ARRLEN(make_keywords); i++) {
+    const char *cmp = make_keywords[i];
+    size_t cmp_len = strlen(cmp);
+    if (len == cmp_len && STRCMP(t, cmp, cmp_len)) {
+      return cmp_len;
+    }
+  }
+  return 0;
+}
+
+static bool make_is_line_comment = false;
+static size_t make_highlight_next = 0;
+void make_handle_highlighting(DynBuffer *screen, Editor *e, Line line, size_t col) {
+	if (col == 0) make_is_line_comment = false;
+	if (make_is_line_comment) return;
+	char *curr = &e->text[line.start + col];
+	size_t op_len = make_is_operator(curr, line.len - col);
+	if (op_len > 0) {
+		dyn_buffer_append(screen, "\033[0;35m", 7);
+		make_highlight_next = op_len;
+ 	} else {
+		for (size_t i = 0; i < e->words->len; i++) {
+			Word w = e->words->buff[i];
+			if (w.start == line.start + col) {
+				size_t kw_len = make_is_keyword(curr, w.len);
+				if (kw_len > 0) {
+					dyn_buffer_append(screen, "\033[0;31m", 7);
+					make_highlight_next = kw_len;
+				} else {
+					if (col == 0 && w.start + w.len < e->str_len && e->text[w.start + w.len] == ':') {
+						dyn_buffer_append(screen, "\033[0;36m", 7);
+						make_highlight_next = w.len;
+					}
+				}
+			}
+		}
+	}
+	if (make_is_line_comment)
+    dyn_buffer_append(screen, "\033[0;90m", 7);
+  else if (make_highlight_next == 0) {
+    dyn_buffer_append(screen, "\033[0m", 4);
+  } else
+     make_highlight_next -= 1;	
+}
+
+//#endif //MAKE_SUPPORT
+void handle_output(Editor *e) {
+	
+  c_is_quote = false;
+  c_is_block_comment = false;
+  c_is_line_comment = false;
+	make_is_line_comment = false;
 
   DynBuffer *screen = dyn_buffer_new();
   // hide cursor to avoid possible tearing effect
   dyn_buffer_append(screen, "\033[?25l", 6);
   clear_screen(screen);
   // draw text
+	
   for (size_t i = e->scrollv; i < e->lines->len && i < e->rows; i++) {
-    // should be off at the end of the line
-    is_line_comment = false;
+   
     Line l = e->lines->buff[i];
     size_t len;
     if (l.len > e->cols) {
@@ -119,69 +254,10 @@ void handle_output(Editor *e) {
     } else {
       len = l.len - e->scrollh;
     }
-    size_t when_unhighlight = 0;
+  
     for (size_t j = 0; j < len; j++) {
-      char *curr = &e->text[l.start + j];
-      if (is_block_comment) {
-        if (STRLITCMP(curr, END_BLOCK_COMMENT)) {
-          is_block_comment = false;
-          // make sure the last quote still shows up
-          when_unhighlight = 2;
-        }
-      } else if (!is_line_comment) {
-        if (*curr == '"' || *curr == '\'') {
-          if (is_quote) {
-            is_quote = false;
-            when_unhighlight = 1;
-          } else
-            is_quote = true;
-        } else if (e->text[l.start + j] == '<')
-          is_quote = true;
-        else if (e->text[l.start + j] == '>') {
-          is_quote = false;
-          when_unhighlight = 1;
-        } else if (!is_quote) {
-					if (STRCMP(curr, LINE_COMMENT, 2))
-          is_line_comment = true;
-        else if (STRCMP(curr, START_BLOCK_COMMENT, 2))
-          is_block_comment = true;
-        else if (isdigit(*curr)) {
-					if (when_unhighlight == 0) {
-						dyn_buffer_append(screen, "\033[34m", 5);
-            when_unhighlight = 1;
-					}
-        } else {
-					size_t op_len = is_operator(curr, strlen(curr));
-					if (op_len > 0) {
-						if (when_unhighlight == 0) {
-							dyn_buffer_append(screen, "\033[31m", 5);
-							when_unhighlight = op_len;
-						}
-					} else {
-						for (size_t i = 0; i < e->words->len; i++) {
-							Word w = e->words->buff[i];
-							if (w.start == l.start + j) {
-								if (is_keyword(&e->text[w.start], w.len)) {
-									if (when_unhighlight == 0) {
-										 dyn_buffer_append(screen, "\033[31m", 5);
-										 when_unhighlight = w.len;
-									}
-								}
-							}
-						}
-					}
-        }
-				}
-      }
-      if (is_block_comment || is_line_comment)
-        dyn_buffer_append(screen, "\033[0;90m", 7);
-      else if (is_quote)
-        dyn_buffer_append(screen, "\033[0;33m", 7);
-      else if (when_unhighlight == 0) {
-        dyn_buffer_append(screen, "\033[0m", 4);
-      } else
-        when_unhighlight -= 1;
-
+			c_handle_highlighting(screen, e, l, j);
+			//make_handle_highlighting(screen, e, l, j);
       size_t index = l.start + e->scrollh + j;
       char c = e->text[index];
       // tab
@@ -198,7 +274,6 @@ void handle_output(Editor *e) {
     dyn_buffer_append(screen, "\r\n", 2);
   }
   // draw cursor
-
   char buff[32];
   size_t len =
       snprintf(buff, sizeof(buff), "\033[%zu;%zuf", e->cy + 1, e->cx + 1);
