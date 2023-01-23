@@ -3,7 +3,7 @@ include config.mk
 SRCS = input.c jed.c output.c
 NAME=jed
 ifeq ($(DEBUG),1)
-	FINAL_CFLAGS=$(CFLAGS) $(DEBUG_FLAGS)
+	FINAL_CFLAGS=$(CFLAGS) -DDEBUG=$(DEBUG) $(DEBUG_FLAGS)
 else
 	FINAL_CFLAGS=$(CFLAGS)
 endif

@@ -9,11 +9,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#define JODCCL_IMPLEMENTATION
-#include "jodccl.h"
-
 struct termios orig_termios;
-
 
 void enter_raw_mode(void) {
 	struct termios raw;
@@ -22,14 +18,6 @@ void enter_raw_mode(void) {
 	}
 	
 	raw = orig_termios;
-	/*
-	raw.c_lflag &= ~(ECHO | ECHONL | ICANON | IEXTEN | ISIG);
-	raw.c_iflag &= ~(IXON | ICRNL  | IGNBRK| PARMRK | BRKINT | INPCK | ISTRIP);
-	raw.c_oflag &= ~(OPOST);
-	raw.c_cflag |= (CS8);
-	raw.c_cc[VMIN] = 0;
-	raw.c_cc[VTIME] = 1;
-	*/
 	cfmakeraw(&raw);
 
 	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) {
@@ -138,22 +126,18 @@ Lines *gen_lines(char *buffer, size_t len) {
 
 
 int main(int argc, char **argv) {
-	(void)argc;
-	
 	enter_raw_mode();
 	atexit(exit_raw_mode);
 
 	bool test = false;
 	char *path = NULL;
 
-	jcl_add_bool(&test, "test", "t", NULL, false);
-	jcl_add_str(&path, "path", "p", NULL, false);
-	JCLError err = jcl_parse_args(argv);
-	if (err.err != JCL_PARSE_OK) {
-		jcl_print_error(err);
-		return 1;
+	if (argc > 1) {
+		char *str = argv[1];
+		if (STRCMP(str, "test", 4)) test = true;
+		else path = str;
 	}
-
+	
 	if (test) {
 		while (true) {
 			char c;
@@ -178,9 +162,7 @@ int main(int argc, char **argv) {
 							 .real_cursor = 0,
 							 .scrollv			= 0, };
 	
-	if (set_screen_size(&e) < 0) {
-		DIE("get_screen_size");
-	}
+	
 	if (path) {
 		e.text = read_file(path);
 	} else {
@@ -191,7 +173,9 @@ int main(int argc, char **argv) {
 	e.lines = gen_lines(e.text, e.str_len);
 
 	while (!e.quit) {
-		handle_output(&e);
+		if (set_screen_size(&e) < 0)
+			DIE("get_screen_size");
+    handle_output(&e);
 		handle_input(&e);
 	}
 	lines_free(e.lines);
@@ -228,8 +212,7 @@ void lines_free(Lines *ls) {
 }
 
 inline size_t current_line(Editor *e) {
-		return e->cy;
-	//return e->cy;
+	return e->cy + e->scrollv;
 }
 
 
@@ -283,7 +266,7 @@ void write_char(Editor *e, char c) {
 	if (e->words == NULL) DIE("failed to allocate words");
 }
 
-void set_cursor(Editor *e) {
+void set_cursor_y(Editor *e) {
 	size_t lcount = 0;
 	for (size_t counter = 0; counter < e->real_cursor; counter++) {
 		char c = e->text[counter];
@@ -292,12 +275,12 @@ void set_cursor(Editor *e) {
 		}
 	}
 	e->cy = lcount;
+}
+void set_cursor_x(Editor *e) {
 	size_t line = current_line(e);
 	size_t start = e->lines->buff[line].start;
 	size_t pos = e->real_cursor - start;
-	if (pos > 1000) {
-		sleep(1);
-	}
+	
 	LOG("line_start: %zu\n", e->lines->buff[line].start);
 	LOG("curr_line: %zu\n", line);
 	LOG("lines_len %zu\n", e->lines->len);
@@ -341,22 +324,30 @@ void words_free(Words *ws) {
 }
 
 void run_after_move(Editor *e) {
-	set_cursor(e);
-	/*
-	size_t line_num = current_line(e);
-	Line l = e->lines->buff[line_num];
 
-	int diff = e->real_cursor - l.start - e->cols;
+	set_cursor_y(e);
+	size_t line_num = current_line(e);
+
+	int diff = line_num + 1 - e->rows - e->scrollv;
+	if (diff < 0) diff = 0;
+	e->scrollv = diff;
+	if (diff > 0) LOG("new  scrollv: %zu\n", e->scrollv);
+	e->cy -= diff;
+	
+	set_cursor_x(e);
+	// has to be a seperate call since the original is no longer valid
+	Line l = e->lines->buff[current_line(e)];
+	diff = e->real_cursor - l.start - e->cols;
 	if (diff < 0) diff = 0;
 	e->scrollh = diff;
 	if (diff > 0) LOG("new scrollh: %zu\n", e->scrollh);
+	e->cx -= diff;
 	
-	diff = (line_num + 1) - e->rows;
-	if (diff < 0) diff = 0;
-	e->scrollv = diff;
-	if (diff > 0) LOG("new scrollv: %zu\n", e->scrollv);
-	
+
 	LOG("real_cursor: %zu\n", e->real_cursor);
 	LOG("cx: %zu, cy: %zu\n", e->cx, e->cy);
-	*/
+}
+
+void editor_enter_minibuffer(Editor *e) {
+	
 }
